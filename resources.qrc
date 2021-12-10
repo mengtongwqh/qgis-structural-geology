@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/plugins/qgis-structural-geology" >
+        <file>line_icon.ico</file>
+        <file>plane_icon.ico</file>
+    </qresource>
+</RCC>
