@@ -2,7 +2,7 @@ import os
 import numpy as np
 import stgeotk as stg
 
-from qgis.core import QgsMapLayer, QgsMessageLog
+from qgis.core import QgsMapLayer, QgsMessageLog, Qgis
 from qgis.PyQt import uic 
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon, QColor
@@ -176,32 +176,37 @@ class StereonetPlugin:
         clr = self.options["marker_color_field"]
         has_plane_data = False
 
-        layer = self.iface.layerTreeView().currentLayer()
-        if layer.type() != QgsMapLayer.VectorLayer:
-            return
+        layers = self.iface.layerTreeView().selectedLayersRecursive()
+        
+        for layer in layers:
 
-        # trend and plunge
-        if has_field(layer, trd) and has_field(layer, plg):
-            it = layer.selectedFeatures()
-            for feature in it:
-                data.append([feature[trd], feature[plg]])
+            if layer.type() != QgsMapLayer.VectorLayer:
+               continue
+            else:
+                QgsMessageLog.logMessage(layer.name() + " is selected", "qgis-structural-geology", level=Qgis.Info)
 
-        # strike and dip
-        if has_field(layer, stk) and has_field(layer, dip):
-            it =layer.selectedFeatures()
-            for feature in it:
-                data.append(stg.pole_to_plane([feature[stk], feature[dip]]))
-            has_plane_data = True
+            # trend and plunge
+            if has_field(layer, trd) and has_field(layer, plg):
+                it = layer.selectedFeatures()
+                for feature in it:
+                    data.append([feature[trd], feature[plg]])
+
+            # strike and dip
+            if has_field(layer, stk) and has_field(layer, dip):
+                it =layer.selectedFeatures()
+                for feature in it:
+                    data.append(stg.pole_to_plane([feature[stk], feature[dip]]))
+                has_plane_data = True
+
+            # color data
+            if clr and has_field(layer, clr):
+                it = layer.selectedFeatures()
+                for feature in it:
+                    color_data.append(feature[clr])
 
         # nothing to do for empty dataset
         if not data:
             return
-
-        # color data
-        if clr and has_field(layer, clr):
-            it = layer.selectedFeatures()
-            for feature in it:
-                color_data.append(feature[clr])
 
         # generate lineation plot
         self.stereonet = stg.Stereonet()
@@ -231,8 +236,7 @@ class StereonetPlugin:
 
             # print the plane from pole
             avg_plane =  stg.plane_from_pole(avg_pole)
-            print(avg_plane)
-
+            QgsMessageLog.logMessage("Average plane = " + str(avg_plane), "qgis-structural-geology", level=Qgis.Info)
             avg_plane_data.load_data(stg.plane_from_pole(avg_pole), "Average plane")
             avg_plane_plot = stg.PlanePlot(self.stereonet, avg_plane_data)
             self.stereonet.append_plot(avg_plane_plot)
@@ -254,17 +258,20 @@ class StereonetPlugin:
 
 
     def plot_planes(self):
-        layers = self.iface.layerTreeView().selectedLayers()
+        layers = self.iface.layerTreeView().selectedLayersRecursive()
         data = []
+        data_normal  = []
         stk, dip = self.options["strike_field"], self.options["dip_field"]
 
         for layer in layers:
+            QgsMessageLog.logMessage(layer.name() + " is selected", "qgis-structural-geology", level=Qgis.Info)
             if layer.type() == QgsMapLayer.VectorLayer:
                 # trend and plunge
                 if has_field(layer, stk) and has_field(layer, dip):
                     it = layer.selectedFeatures()
                     for feature in it:
                         data.append([feature[stk], feature[dip]])
+                        data_normal.append(stg.pole_to_plane([feature[stk], feature[dip]]))
             else:
                 continue
 
@@ -278,6 +285,16 @@ class StereonetPlugin:
         dataset.load_data(np.array(data, dtype=np.double))
         plane_plot = stg.PlanePlot(self.stereonet, dataset)
         self.stereonet.append_plot(plane_plot)
+        dataset_normal = stg.LineData()
+        dataset_normal.load_data(data_normal)
+
+        # generate average intersection
+        avg_intersect = stg.LineData()
+        QgsMessageLog.logMessage(str(dataset_normal.eigen()[1]), "qgis-structural-geology", level=Qgis.Info)
+        avg_intersect.load_data(dataset_normal.eigen()[0][0], "Average Intersect")
+        avg_intersect_plot = stg.LinePlot(self.stereonet, avg_intersect, marker='*')
+        self.stereonet.append_plot(avg_intersect_plot)
+        
         self.stereonet.generate_plots()
 
 
@@ -322,7 +339,7 @@ class StereonetPlugin:
         self.options["marker_size"] = dlg.marker_size_spinbox.value()
         self.options["marker_color"] = dlg.marker_colorbutton.color().name()
 
-        if dlg.marker_color_by_data_field_radio.isChecked():
+        if dlg.color_by_data_field_radio.isChecked():
             self.options["marker_color_field"] = dlg.marker_color_field.currentField()
         else:
             self.options["marker_color_field"] = ""
@@ -335,7 +352,8 @@ class StereonetPlugin:
 
         self.options["marker_cmap"] = dlg.marker_colormap_combobox.currentText()
 
-        print(self.options)
+        #  print(self.options)
+        QgsMessageLog.logMessage(str(self.options), "qgis-structural-geology", level=Qgis.Info)
 
 
     def add_action(
