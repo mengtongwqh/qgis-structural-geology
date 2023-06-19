@@ -415,9 +415,9 @@ class StereonetPlugin:
                 selected_features = layer.selectedFeatures()
                 for feature in selected_features:
                     direc = feature[direc_field]
-                    if stk != NULL and dip != NULL:
-                        stk = feature[direc_field] - 90 * self.options["use_dip_dir"]
-                        dip = feature[dip_field]
+                    dip = feature[dip_field]
+                    if direc != NULL and dip != NULL:
+                        stk = direc - 90 * self.options["use_dip_dir"]
                         data.append([stk, dip])
                         data_normal.append(stg.pole_to_plane([stk, dip]))
 
@@ -482,9 +482,10 @@ class StereonetPlugin:
             if has_field(layer, direc_field) and has_field(layer, dip_field):
                 selected_features = layer.selectedFeatures()
                 for feature in selected_features:
-                    stk = feature[direc_field] - 90 * self.options["use_dip_dir"]
+                    direc = feature[direc_field]
                     dip = feature[dip_field]
-                    if stk != NULL and dip != NULL:
+                    if direc != NULL and dip != NULL:
+                        stk = direc - 90 * self.options["use_dip_dir"]
                         data.append(stg.pole_to_plane([stk, dip]))
                         if clr and has_field(layer, clr):
                             color_data.append(feature[clr])
@@ -544,7 +545,7 @@ class StereonetPlugin:
                 self.stereonet,
                 dataset,
                 **common_opts,
-                cmap=self.options["cmap"],
+                cmap=self.options["marker_cmap"],
                 cmap_center=self.options["marker_cmap_center"],
                 cmap_limits=self.options["marker_cmap_limits"],
             )
